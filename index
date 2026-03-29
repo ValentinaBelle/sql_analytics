@@ -1,0 +1,36 @@
+# failed transaction / payment gates
+SELECT 
+  gateway,
+  COUNT(*) as fail_count,
+  ROUND(AVG(response_time), 2) as avg_response,
+  SUM(amount) as failed_volume
+FROM transactions 
+WHERE status = 'fail' 
+  AND created_at >= CURDATE() - INTERVAL 7 DAY
+GROUP BY gateway 
+ORDER BY fail_count DESC 
+LIMIT 5;
+
+# payment gates availability (%)
+SELECT 
+  channel,
+  COUNT(*) as total_tx,
+  SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) as success_tx,
+  ROUND(SUM(CASE WHEN status='success' THEN 1 ELSE 0 END)*100/COUNT(*), 2) as success_rate
+FROM transactions 
+WHERE created_at >= CURDATE() - INTERVAL 7 DAY
+GROUP BY channel 
+HAVING total_tx > 100
+ORDER BY success_rate;
+
+# 503 timeout analysis (for example)
+SELECT 
+  DATE(created_at) as date,
+  HOUR(created_at) as hour,
+  COUNT(*) as timeout_count
+FROM transactions 
+WHERE error_code = '503' 
+  AND response_time > 30
+  AND created_at >= CURDATE() - INTERVAL 7 DAY
+GROUP BY DATE(created_at), HOUR(created_at)
+ORDER BY timeout_count DESC;
